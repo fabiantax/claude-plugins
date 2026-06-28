@@ -1,0 +1,60 @@
+# SkillOpt Phase 1 config — fab-swarm Rust bugfix env via GLM-5.1.
+#
+# Wire-up:
+#   - Env: _fab_swarm_rust (registered by the train.py patch in this branch)
+#   - Backend: openai_compatible mode pointing at Z.AI's OpenAI-compat endpoint
+#   - Optimizer + Target: GLM-5.1 via Z.AI
+#   - Train data: 4 atlas bugfix tasks at ~/Developer/personal/atlas/.skillopt/tasks/train/batch_001.json
+#   - Skill being optimized: ~/.claude/skills/skillopt-rust-bugfix/SKILL.md
+#
+# Usage (via the launcher that sources env from .claude/settings.local.json):
+#   cd <repo-with-settings.local.json>
+#   ~/.claude/skills/skillopt-rust-bugfix/scripts/skillopt-train-glm51.sh \
+#     --config ~/.claude/skills/skillopt-rust-bugfix/.skillopt/glm51-phase1.yaml
+
+model:
+  # The trainer's backend_config accepts: openai_chat | claude_chat | qwen_chat | minimax_chat.
+  # `openai_chat` + AZURE_OPENAI_AUTH_MODE=openai_compatible (set by the launcher)
+  # routes through the plain OpenAI client to Z.AI's OpenAI-compat endpoint.
+  backend: openai_chat
+  optimizer_backend: openai_chat
+  target_backend: openai_chat
+  optimizer: glm-5.1
+  target: glm-5.1
+
+train:
+  num_epochs: 1
+  batch_size: 2     # train split has 2 items; one batch per epoch
+  accumulation: 1   # no gradient accumulation
+  seed: 42
+
+gradient:
+  merge_batch_size: 1
+
+optimizer:
+  # `edit_budget` in skillopt internals — the YAML key is `learning_rate`.
+  learning_rate: 2
+  min_learning_rate: 2
+
+env:
+  name: _fab_swarm_rust
+  # skill_init is the path to the SKILL.md file the trainer will optimise.
+  # (Misnamed key in skillopt — it's the path, not text content.)
+  skill_init: /home/fabian/.claude/skills/skillopt-rust-bugfix/SKILL.md
+  split_dir: /home/fabian/Developer/personal/atlas/.skillopt/tasks
+  workers: 1
+  minibatch_size: 2  # 4 tasks total; ~2 per minibatch
+  failure_only: false
+  max_completion_tokens: 4096
+  # Augment file-match scoring with an LLM judge (50/50 blend with deterministic).
+  # The judge routes through chat_optimizer so it uses the same Z.AI backend.
+  # Set SKILLOPT_JUDGE_HARD_THRESHOLD env var to override the default 0.7 hard cutoff.
+  use_llm_judge: true
+
+evaluation:
+  use_gate: true
+  gate_metric: hard       # 0/1 — predicted_file == gold broken_file?
+  gate_mixed_weight: 0.5
+  sel_env_num: 1          # val split has 1 item
+  test_env_num: 1         # test split has 1 item
+  eval_test: false        # skip final test eval to keep Phase 1 cheap

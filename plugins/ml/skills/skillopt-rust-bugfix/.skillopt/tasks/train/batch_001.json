@@ -1,0 +1,50 @@
+[
+  {
+    "id": "atlas-127",
+    "task_type": "bugfix",
+    "question": "Fix bug #127: atlas query --quiet suppresses the query result itself (empty output). The --quiet flag should only suppress logs/headers, not the actual data.",
+    "context": {
+      "broken_file": "crates/atlas-cli/src/commands/graphfusion_query.rs",
+      "fix_type": "flag_logic",
+      "difficulty": "trivial",
+      "expected_loc": 1,
+      "expected_time_min": 2
+    }
+  },
+  {
+    "id": "atlas-143",
+    "task_type": "bugfix",
+    "question": "Fix bug #143: atlas stats is advertised but returns 'Stats command is not yet implemented'. The implementation already exists at commands/stats.rs but the call is commented out in main.rs.",
+    "context": {
+      "broken_file": "crates/atlas-cli/src/main.rs",
+      "fix_type": "commented_out_impl",
+      "difficulty": "trivial",
+      "expected_loc": 2,
+      "expected_time_min": 1
+    }
+  },
+  {
+    "id": "atlas-113",
+    "task_type": "bugfix",
+    "question": "Fix bug #113: atlas init writes a .atlas.toml the current binary can't parse. The fast-path template writes parallel_init, enable_wal, cache_ttl, pool_size but NOT cache_dir. The parser expects cache_dir but doesn't know those other fields.",
+    "context": {
+      "broken_file": "crates/atlas-config/src/lib.rs",
+      "fix_type": "serde_default",
+      "difficulty": "easy",
+      "expected_loc": 8,
+      "expected_time_min": 5
+    }
+  },
+  {
+    "id": "atlas-118",
+    "task_type": "bugfix",
+    "question": "Fix bug #118: cargo fmt --check fails on 2 files. Just run cargo fmt --all and commit.",
+    "context": {
+      "broken_file": "crates/atlas-cli/src/commands/scan/cmd.rs,crates/atlas-cli/src/commands/scan/output.rs",
+      "fix_type": "fmt",
+      "difficulty": "trivial",
+      "expected_loc": 0,
+      "expected_time_min": 1
+    }
+  }
+]

@@ -11,6 +11,17 @@ import os, re, shutil, sys
 SRC = "/home/fabian/.claude/skills"
 REPO = "/home/fabian/Developer/personal/claude-plugins"
 
+# Directories/files never copied from a source skill dir (runtime cruft, build
+# artifacts, or stale normalized-name dupes — SKILL.md is the canonical name).
+JUNK_NAMES = (".venv", "venv", "__pycache__", ".cache")
+
+
+def junk_ignore(directory, names):
+    """shutil.copytree ignore-pattern: drop junk at every depth (so nested
+    e.g. deliberate/gepa/__pycache__ is pruned, not just top-level)."""
+    return [n for n in names
+            if n in JUNK_NAMES or n.endswith(".bak") or ".bak-" in n]
+
 ALLOCATION = {
     "fab": ["loopit","deliberate","prioritize","ship","plan-and-decompose","visual-plan","visual-recap","quick-recap","catch-up","handover","triz","creative-thinking","creative-thinking-ml","stay-within-limits","rust-decouple","preview","mermaid-local","loop-improvement","svelte-error-handling","svelte-performance","scrapling","emd-optimization"],
     "mesh": ["fab-agent-runtime","fab-agent-add-mesh","fab-agent-add-peer","mesh-context","graphfusion","gitea","gitea-pm","gitea-bots","woodpecker","bifrost","tensorzero-gateway","openobserve"],
@@ -90,15 +101,21 @@ for plugin, skills in ALLOCATION.items():
         src_dir = os.path.join(SRC, skill)
         src_loose = os.path.join(SRC, skill + ".md")
         dst_dir = os.path.join(plug_skills_dir, skill)
+        # clean dst first so re-runs don't leave stale dupes (e.g. a source's
+        # lowercase skill.md / README.md after normalization to SKILL.md).
+        if os.path.isdir(dst_dir):
+            shutil.rmtree(dst_dir)
         os.makedirs(dst_dir, exist_ok=True)
 
         if os.path.isdir(src_dir):
             # copy whole dir (preserves assets), then normalize skill file name
             for entry in os.listdir(src_dir):
+                if entry in JUNK_NAMES or entry.endswith(".bak") or ".bak-" in entry:
+                    continue
                 s = os.path.join(src_dir, entry)
                 d = os.path.join(dst_dir, entry)
                 if os.path.isdir(s):
-                    shutil.copytree(s, d, dirs_exist_ok=True)
+                    shutil.copytree(s, d, dirs_exist_ok=True, ignore=junk_ignore)
                 else:
                     shutil.copy2(s, d)
             skill_file = find_skill_file(dst_dir)
@@ -130,6 +147,77 @@ for plugin, skills in ALLOCATION.items():
                 f.write(new_text)
             fm_added += 1
         copied += 1
+
+# ----------------------------------------------------------------------------
+# speckit plugin — reconciled from the mesh repos (NOT ~/.claude/skills).
+#
+# speckit-* was vendored into 4 repos that drifted (version skew, not random):
+#   fab-trader        = OLD generation (no post-execution-hooks / extensions.yml)
+#   fab-agent-mesh    = NEWER generation (hooks system); sole source of git-* + agent-context
+#   GraphFusion       = NEWEST (≡ localscout, byte-identical; feature_numbering deprecation)
+#   localscout        = ≡ GraphFusion
+# Reconciliation rule (locked): core-9 from GraphFusion, git-6 from fab-agent-mesh.
+# Upstream canonical: ~/code/tools/spec-kit @ 2dd1ca4 (templates/commands + extensions).
+# ----------------------------------------------------------------------------
+SPECKIT_MESH_REPOS = "/home/fabian/Developer/personal"
+SPECKIT_SOURCES = {
+    # core-9: GraphFusion = newest generation (≡ localscout, verified byte-identical)
+    "speckit-specify":       ("GraphFusion",),
+    "speckit-plan":          ("GraphFusion",),
+    "speckit-tasks":         ("GraphFusion",),
+    "speckit-analyze":       ("GraphFusion",),
+    "speckit-checklist":     ("GraphFusion",),
+    "speckit-clarify":       ("GraphFusion",),
+    "speckit-constitution":  ("GraphFusion",),
+    "speckit-implement":     ("GraphFusion",),
+    "speckit-taskstoissues": ("GraphFusion",),
+    # git-* + agent-context: only in fab-agent-mesh
+    "speckit-git-commit":           ("fab-agent-mesh",),
+    "speckit-git-feature":          ("fab-agent-mesh",),
+    "speckit-git-initialize":       ("fab-agent-mesh",),
+    "speckit-git-remote":           ("fab-agent-mesh",),
+    "speckit-git-validate":         ("fab-agent-mesh",),
+    "speckit-agent-context-update": ("fab-agent-mesh",),
+}
+JUNK = JUNK_NAMES  # alias to the shared junk constant
+
+speckit_copied = 0
+speckit_errors = []
+speckit_dir = os.path.join(REPO, "plugins", "speckit", "skills")
+for skill, (origin_repo,) in SPECKIT_SOURCES.items():
+    src_dir = os.path.join(SPECKIT_MESH_REPOS, origin_repo, ".claude", "skills", skill)
+    dst_dir = os.path.join(speckit_dir, skill)
+    if not os.path.isdir(src_dir):
+        speckit_errors.append(f"{skill}: source not found in {origin_repo} ({src_dir})")
+        continue
+    # clean dst first (idempotent re-runs, same as the standard allocation loop)
+    if os.path.isdir(dst_dir):
+        shutil.rmtree(dst_dir)
+    os.makedirs(dst_dir, exist_ok=True)
+    for entry in os.listdir(src_dir):
+        if entry in JUNK or entry.endswith(".bak") or ".bak-" in entry:
+            continue
+        s = os.path.join(src_dir, entry)
+        d = os.path.join(dst_dir, entry)
+        if os.path.isdir(s):
+            shutil.copytree(s, d, dirs_exist_ok=True, ignore=junk_ignore)
+        else:
+            shutil.copy2(s, d)
+    skill_file = find_skill_file(dst_dir)
+    if skill_file is None:
+        speckit_errors.append(f"{skill}: no skill file found after copy")
+        continue
+    target = os.path.join(dst_dir, "SKILL.md")
+    if os.path.abspath(skill_file) != os.path.abspath(target):
+        if os.path.exists(target):
+            os.remove(target)
+        shutil.move(skill_file, target)
+        skill_file = target
+    speckit_copied += 1
+
+print(f"speckit: reconciled {speckit_copied} skills from mesh repos.")
+copied += speckit_copied
+errors.extend(speckit_errors)
 
 # copy the loopit command
 loopit_cmd_src = "/home/fabian/.claude/commands/loopit.md"

@@ -1,0 +1,39 @@
+# SkillOpt config — optimize Atlas bugfix skill using local llama-server
+#
+# Usage: skillopt-train --config .skillopt/atlas-bugfix.yaml
+#
+# Backend: qwen_chat pointing at local llama-server (port 8002)
+# Target: same model (Qwen3.6-35B-A3B)
+# Optimizer: same model (self-reflective)
+
+model:
+  backend: qwen_chat
+  optimizer: Qwen3.6-35B-A3B
+  target: Qwen3.6-35B-A3B
+  qwen_chat_base_url: http://127.0.0.1:8002/v1
+  qwen_chat_api_key: dummy
+  qwen_chat_temperature: 0.3
+  qwen_chat_timeout_seconds: 120
+  qwen_chat_max_tokens: 8192
+
+train:
+  skill_path: .claude/skills/rust-bugfix.md
+  num_epochs: 3
+  skill_init: |
+    You are optimizing a skill document for fixing bugs in the Atlas Rust CLI.
+    The skill should minimize agent exploration time and maximize fix precision.
+    Current issues with unoptimized prompts:
+    - Agents spend 17+ min exploring codebase for 10-line fixes
+    - Vague prompts like "find and fix X" cause agents to read 20+ files
+    - Worktree setup overhead is wasted on trivial fixes
+    The optimized skill should produce prompts that lead to <5 min total fix time.
+
+env:
+  name: _template  # Using template — we provide task batches manually
+  split_dir: .skillopt/tasks
+  workers: 1
+  minibatch_size: 4
+  failure_only: false
+
+evaluation:
+  metric: hard  # 0/1 — did the fix compile and close the issue?

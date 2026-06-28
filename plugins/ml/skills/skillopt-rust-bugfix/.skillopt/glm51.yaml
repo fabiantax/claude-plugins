@@ -1,0 +1,57 @@
+# SkillOpt config — optimize a skill via GLM-5.1 (Z.AI) using the
+# Anthropic-compat backend.
+#
+# Usage (via the launcher that sources env from .claude/settings.local.json):
+#   ./scripts/skillopt-train-glm51.sh
+#
+# The launcher reads ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN from the
+# CWD's .claude/settings.local.json `env` block and exports them so the
+# `claude` CLI subprocess (spawned by skillopt's claude_backend) talks
+# to Z.AI's GLM-5.1 instead of Anthropic.
+#
+# Why backend=claude and not qwen_chat / glm_chat:
+#   skillopt's router.py only wires `azure_openai`, `claude`, `codex`
+#   into _backend_module. `qwen_chat` and `minimax_chat` exist as files
+#   but raise ValueError at set_backend time. Adding a `glm_chat`
+#   backend would require modifying installed site-packages — out of
+#   scope for an initial wire-up. The `claude` CLI happily talks to
+#   Z.AI's Anthropic-compat endpoint via ANTHROPIC_BASE_URL.
+
+model:
+  backend: claude
+  optimizer: glm-5.1
+  target: glm-5.1
+
+train:
+  skill_path: /home/fabian/.claude/skills/skillopt-rust-bugfix/SKILL.md
+  num_epochs: 1
+  skill_init: |
+    You are optimizing a workflow skill document for the fab-swarm Rust
+    workspace. The skill must minimise agent exploration time and
+    enforce DELEGATION: any single-file edit >30 LOC or any task
+    touching >1 file must be split into a parallel coder-agent team
+    rather than written inline in the main context.
+
+    Current pain (verified): the main-context agent wrote 4 wire-related
+    Rust modules (~700 LOC across cli/wire.rs, commands/wire/mcp_json.rs,
+    commands/wire/settings_merge.rs, commands/wire/mod.rs) inline
+    instead of delegating to parallel coder agents — a direct violation
+    of the CLAUDE.md "Agent Delegation MANDATORY" section that the
+    current skill doc does not enforce.
+
+    The optimized skill should produce prompts that lead to:
+      - <2 min context-loading (Grep+Read of <=5 files, never full-file
+        reads of >300 LOC modules)
+      - parallel coder-agent fan-out for any multi-file feature work
+      - architect-mode in main context (review, synthesize, never
+        long-form code drafting)
+
+env:
+  name: _template
+  split_dir: /home/fabian/.claude/skills/skillopt-rust-bugfix/.skillopt/tasks
+  workers: 1
+  minibatch_size: 4
+  failure_only: false
+
+evaluation:
+  metric: hard
