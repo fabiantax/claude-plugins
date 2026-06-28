@@ -3,34 +3,34 @@
   "owner": { "name": "fabiantax" },
   "plugins": [
     {
-      "name": "fab-coding-loop",
-      "source": "./plugins/fab-coding-loop",
+      "name": "fab",
+      "source": "./plugins/fab",
       "description": "Portable coding-loop & working-method skills: loopit, deliberate, prioritize, ship, plan-and-decompose, triz, creative-thinking, visual-plan/recap, catch-up, handover, and Svelte/Rust working aids.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
-      "name": "fab-mesh",
-      "source": "./plugins/fab-mesh",
+      "name": "mesh",
+      "source": "./plugins/mesh",
       "description": "Host-bound A2A mesh + self-hosted-service skills: fab-agent-runtime peer lifecycle, mesh-context, graphfusion, gitea/gitea-pm/gitea-bots, woodpecker, bifrost, tensorzero-gateway, openobserve. Opt-in (host-specific).",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
-      "name": "fab-quant",
-      "source": "./plugins/fab-quant",
+      "name": "quant",
+      "source": "./plugins/quant",
       "description": "Quant value-stream skills: fab-swarm-trading, indicator-creator, quant-consult, efficient-frontier, fable-efficient, cosmos-gl, casbin-ecosystem, pi-coding-agent, moshi-best-practices.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
-      "name": "strix-machine",
-      "source": "./plugins/strix-machine",
+      "name": "strix",
+      "source": "./plugins/strix",
       "description": "Strix-box-only reference skills: llama.cpp (ROCm/Vulkan), vLLM (historical), ROCm profiling, RDNA 3.5 / Qwen 3.6 architecture, hipBLAS internals, Triton kernels, PyTorch-ROCm, container/toolbox ML stacks. Opt-in (machine-specific).",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
-      "name": "fab-ml-lab",
-      "source": "./plugins/fab-ml-lab",
+      "name": "ml",
+      "source": "./plugins/ml",
       "description": "Portable ML eval/bench/training skills: model-guide/picker/quantization, code-bench, niah-bench, llm-eval-overview, thinking-eval, huggingface-workflow, gpu-bench-pipeline, mlflow-experiments, model-training, gepa, skillopt-rust-bugfix.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
-  "name": "fab-ml-lab",
-  "version": "0.1.0",
+  "name": "ml",
+  "version": "0.2.0",
   "description": "Portable ML eval/bench/training skills: model-guide/picker/quantization, code-bench, niah-bench, llm-eval-overview, thinking-eval, huggingface-workflow, gpu-bench-pipeline, mlflow-experiments, model-training, gepa, skillopt-rust-bugfix.",
   "author": { "name": "fabiantax" },
   "homepage": "https://github.com/fabiantax/claude-plugins",

@@ -12,11 +12,11 @@ SRC = "/home/fabian/.claude/skills"
 REPO = "/home/fabian/Developer/personal/claude-plugins"
 
 ALLOCATION = {
-    "fab-coding-loop": ["loopit","deliberate","prioritize","ship","plan-and-decompose","visual-plan","visual-recap","quick-recap","catch-up","handover","triz","creative-thinking","creative-thinking-ml","stay-within-limits","rust-decouple","preview","mermaid-local","loop-improvement","svelte-error-handling","svelte-performance","scrapling","emd-optimization"],
-    "fab-mesh": ["fab-agent-runtime","fab-agent-add-mesh","fab-agent-add-peer","mesh-context","graphfusion","gitea","gitea-pm","gitea-bots","woodpecker","bifrost","tensorzero-gateway","openobserve"],
-    "fab-quant": ["fab-swarm-trading","indicator-creator","quant-consult","efficient-frontier","fable-efficient","cosmos-gl","casbin-ecosystem","pi-coding-agent","moshi-best-practices"],
-    "strix-machine": ["llama-cpp-rocm","llama-cpp-vulkan","vllm","vllm-internals","model-runtime","rocm-profiling","rdna35-architecture","pytorch-rocm","hipblas-internals","triton-kernels","qwen36-architecture","container-ml-stack","toolbox-ml"],
-    "fab-ml-lab": ["model-guide","model-picker","model-quantization","code-bench","niah-bench","llm-eval-overview","thinking-eval","huggingface-workflow","gpu-bench-pipeline","mlflow-experiments","model-training","gepa","skillopt-rust-bugfix"],
+    "fab": ["loopit","deliberate","prioritize","ship","plan-and-decompose","visual-plan","visual-recap","quick-recap","catch-up","handover","triz","creative-thinking","creative-thinking-ml","stay-within-limits","rust-decouple","preview","mermaid-local","loop-improvement","svelte-error-handling","svelte-performance","scrapling","emd-optimization"],
+    "mesh": ["fab-agent-runtime","fab-agent-add-mesh","fab-agent-add-peer","mesh-context","graphfusion","gitea","gitea-pm","gitea-bots","woodpecker","bifrost","tensorzero-gateway","openobserve"],
+    "quant": ["fab-swarm-trading","indicator-creator","quant-consult","efficient-frontier","fable-efficient","cosmos-gl","casbin-ecosystem","pi-coding-agent","moshi-best-practices"],
+    "strix": ["llama-cpp-rocm","llama-cpp-vulkan","vllm","vllm-internals","model-runtime","rocm-profiling","rdna35-architecture","pytorch-rocm","hipblas-internals","triton-kernels","qwen36-architecture","container-ml-stack","toolbox-ml"],
+    "ml": ["model-guide","model-picker","model-quantization","code-bench","niah-bench","llm-eval-overview","thinking-eval","huggingface-workflow","gpu-bench-pipeline","mlflow-experiments","model-training","gepa","skillopt-rust-bugfix"],
 }
 
 def slugify(name):
@@ -133,7 +133,7 @@ for plugin, skills in ALLOCATION.items():
 
 # copy the loopit command
 loopit_cmd_src = "/home/fabian/.claude/commands/loopit.md"
-loopit_cmd_dst = os.path.join(REPO, "plugins", "fab-coding-loop", "commands", "loopit.md")
+loopit_cmd_dst = os.path.join(REPO, "plugins", "fab", "commands", "loopit.md")
 if os.path.isfile(loopit_cmd_src):
     shutil.copy2(loopit_cmd_src, loopit_cmd_dst)
     print(f"copied command: loopit.md")

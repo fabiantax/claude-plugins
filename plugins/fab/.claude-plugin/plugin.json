@@ -1,6 +1,6 @@
 {
-  "name": "fab-coding-loop",
-  "version": "0.1.0",
+  "name": "fab",
+  "version": "0.2.0",
   "description": "Portable coding-loop & working-method skills: loopit, deliberate, prioritize, ship, plan-and-decompose, triz, creative-thinking, visual-plan/recap, catch-up, handover, and Svelte/Rust working aids.",
   "author": { "name": "fabiantax" },
   "homepage": "https://github.com/fabiantax/claude-plugins",
