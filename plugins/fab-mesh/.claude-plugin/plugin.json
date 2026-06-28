@@ -1,0 +1,9 @@
+{
+  "name": "fab-mesh",
+  "version": "0.1.0",
+  "description": "Host-bound A2A mesh + self-hosted-service skills: fab-agent-runtime peer lifecycle, mesh-context, graphfusion, gitea/gitea-pm/gitea-bots, woodpecker, bifrost, tensorzero-gateway, openobserve. Opt-in (host-specific).",
+  "author": { "name": "fabiantax" },
+  "homepage": "https://github.com/fabiantax/claude-plugins",
+  "repository": "https://github.com/fabiantax/claude-plugins",
+  "defaultEnabled": false
+}

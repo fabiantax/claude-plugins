@@ -1,0 +1,9 @@
+{
+  "name": "strix-machine",
+  "version": "0.1.0",
+  "description": "Strix-box-only reference skills: llama.cpp (ROCm/Vulkan), vLLM (historical), ROCm profiling, RDNA 3.5 / Qwen 3.6 architecture, hipBLAS internals, Triton kernels, PyTorch-ROCm, container/toolbox ML stacks. Opt-in (machine-specific).",
+  "author": { "name": "fabiantax" },
+  "homepage": "https://github.com/fabiantax/claude-plugins",
+  "repository": "https://github.com/fabiantax/claude-plugins",
+  "defaultEnabled": false
+}

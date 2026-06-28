@@ -1,0 +1,12 @@
+# Python build artifacts (shouldn't ship with skill scripts)
+__pycache__/
+*.pyc
+*.bak
+*.bak-*
+
+# Skill-local venvs that occasionally get swept in
+.venv/
+venv/
+
+# OS/editor noise
+.DS_Store

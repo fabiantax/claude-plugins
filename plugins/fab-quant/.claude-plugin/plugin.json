@@ -1,0 +1,8 @@
+{
+  "name": "fab-quant",
+  "version": "0.1.0",
+  "description": "Quant value-stream skills: fab-swarm-trading, indicator-creator, quant-consult, efficient-frontier, fable-efficient, cosmos-gl, casbin-ecosystem, pi-coding-agent, moshi-best-practices.",
+  "author": { "name": "fabiantax" },
+  "homepage": "https://github.com/fabiantax/claude-plugins",
+  "repository": "https://github.com/fabiantax/claude-plugins"
+}
