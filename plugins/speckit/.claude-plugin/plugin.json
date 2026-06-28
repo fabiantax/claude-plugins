@@ -1,8 +1,0 @@
-{
-  "name": "speckit",
-  "version": "0.1.0",
-  "description": "Spec-driven-development workflow skills (github/spec-kit, pinned at 2dd1ca4): specify, plan, tasks, analyze, checklist, clarify, constitution, implement, taskstoissues + the git-* and agent-context-update extensions.",
-  "author": { "name": "fabiantax" },
-  "homepage": "https://github.com/fabiantax/claude-plugins",
-  "repository": "https://github.com/fabiantax/claude-plugins"
-}

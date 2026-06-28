@@ -31,12 +31,6 @@
       "source": "./plugins/ml",
       "description": "Portable ML eval/bench/training skills: model-guide/picker/quantization, code-bench, niah-bench, llm-eval-overview, thinking-eval, huggingface-workflow, gpu-bench-pipeline, mlflow-experiments, model-training, gepa, skillopt-rust-bugfix.",
       "version": "0.2.0"
-    },
-    {
-      "name": "speckit",
-      "source": "./plugins/speckit",
-      "description": "Spec-driven-development workflow (github/spec-kit @ 2dd1ca4): specify/plan/tasks/analyze/checklist/clarify/constitution/implement/taskstoissues + git-* and agent-context-update extensions. Reconciled canonical copy — the single source of truth that replaces vendored speckit-* in the mesh repos.",
-      "version": "0.1.0"
     }
   ]
 }

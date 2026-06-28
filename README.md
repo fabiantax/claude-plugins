@@ -95,7 +95,16 @@ python3 build.py   # re-copies + normalizes from ~/.claude/skills into plugins/
 
 ## Out of scope
 
-Repo-level skills (`company-loop`, `speckit-*`, per-repo skills) stay versioned
-via their own repos' git. Cross-repo drift of those copies (speckit-* ×6,
-GraphFusion 71, neural-trader 46) is a separate, follow-on cleanup once this
-marketplace exists.
+Repo-level skills (`company-loop`, per-repo skills) stay versioned via their
+own repos' git.
+
+### speckit-* — removed (superseded by the upstream `specify` CLI)
+
+A `speckit` plugin was added in v0.3.0 to dedupe the `speckit-*` skills vendored
+across the mesh repos. It has been **removed** — those skills are now managed by
+the upstream [`specify`](https://github.com/github/spec-kit) CLI, which already
+provides version pinning, per-file manifest hashes, and diff-aware upgrades.
+The plugin re-invented a mechanism upstream ships. The repos manage their
+`speckit-*` skills directly via `.specify/` (GraphFusion, fab-trader,
+localscout, atlas) or are migrated to it (fab-agent-mesh → `specify init`).
+
