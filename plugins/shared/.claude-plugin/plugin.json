@@ -1,0 +1,8 @@
+{
+  "name": "shared",
+  "version": "0.1.0",
+  "description": "Cross-repo-duplicated Claude-Flow community skills reconciled to one canonical (newest) version: github-* (code-review, multi-repo, project/release-management, workflow-automation), swarm-* (advanced, orchestration), skill-builder/creator. Sourced from the neural-trader checkout via build.py. Opt-in.",
+  "author": { "name": "fabiantax" },
+  "homepage": "https://github.com/fabiantax/claude-plugins",
+  "repository": "https://github.com/fabiantax/claude-plugins"
+}

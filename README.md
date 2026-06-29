@@ -1,7 +1,7 @@
 # fab-plugins
 
-A versioned Claude Code marketplace for fabian's custom skills — 69 skills
-packaged into 5 short-namespaced plugins, git-tracked and version-pinned at
+A versioned Claude Code marketplace for fabian's custom skills — 78 skills
+packaged into 6 short-namespaced plugins, git-tracked and version-pinned at
 https://github.com/fabiantax/claude-plugins.
 
 ## Install
@@ -10,12 +10,13 @@ https://github.com/fabiantax/claude-plugins.
 # 1. add the marketplace (do this once per machine)
 /plugin marketplace add https://github.com/fabiantax/claude-plugins
 
-# 2. install the plugins you want (short namespaces — fab, mesh, quant, strix, ml)
+# 2. install the plugins you want (short namespaces — fab, mesh, quant, strix, ml, shared)
 /plugin install fab@fab-plugins        # portable — daily-driver skills — install anywhere
 /plugin install mesh@fab-plugins       # host-bound (A2A mesh + services) — opt-in
 /plugin install quant@fab-plugins      # quant value stream
 /plugin install strix@fab-plugins      # Strix box only (GPU/ROCm/llama.cpp) — opt-in
 /plugin install ml@fab-plugins         # ML eval/bench/training
+/plugin install shared@fab-plugins     # Claude-Flow community skills (github-*/swarm-*/skill-*) — opt-in
 ```
 
 Plugin skills are **namespaced** — invoked as `<plugin>:<skill>`, e.g.
@@ -31,6 +32,7 @@ conflict with skills at other levels (per the Claude Code plugin spec).
 | **`quant`** | portable-ish | fab-swarm-trading, indicator-creator, quant-consult, efficient-frontier, fable-efficient, cosmos-gl, casbin-ecosystem, pi-coding-agent, moshi-best-practices | `true` |
 | **`strix`** | Strix box | llama-cpp-rocm, llama-cpp-vulkan, vllm, vllm-internals, model-runtime, rocm-profiling, rdna35-architecture, pytorch-rocm, hipblas-internals, triton-kernels, qwen36-architecture, container-ml-stack, toolbox-ml | `false` |
 | **`ml`** | portable | model-guide, model-picker, model-quantization, code-bench, niah-bench, llm-eval-overview, thinking-eval, huggingface-workflow, gpu-bench-pipeline, mlflow-experiments, model-training, gepa, skillopt-rust-bugfix | `true` |
+| **`shared`** | portable | github-code-review, github-multi-repo, github-project-management, github-release-management, github-workflow-automation, swarm-advanced, swarm-orchestration, skill-builder, skill-creator | `false` |
 
 `defaultEnabled: false` means the plugin installs disabled — enable the ones you
 need with `/plugin` after install, so a public install elsewhere doesn't pull in
@@ -65,11 +67,24 @@ upgrade:** uninstall the old names, then install the new —
 ```
 .claude-plugin/marketplace.json        # the marketplace (lists all plugins)
 plugins/
-  <plugin>/                            # fab, mesh, quant, strix, ml
+  <plugin>/                            # fab, mesh, quant, strix, ml, shared
     .claude-plugin/plugin.json         # plugin manifest (strict mode)
     skills/<name>/SKILL.md             # + bundled assets (scripts/, references/)
     commands/loopit.md                 # (fab only)
 ```
+
+## `shared` — repo-sourced community skills
+
+Unlike the other 5 plugins (sourced read-only from `~/.claude/skills/`), **`shared`**
+holds cross-repo-duplicated **Claude-Flow community skills** (`github-*`, `swarm-*`,
+`skill-builder`/`skill-creator`) that don't live in `~/.claude/skills`. They are
+sourced from a repo checkout via `REPO_SOURCES` in `build.py` — currently
+`neural-trader/.claude/skills/`, which holds the newest ("9/9 certified")
+generation. This dedupes the drift where the same community skills were vendored
+into GraphFusion (older), neural-trader (newest), Atlas, and the Alies repos.
+Consumer repos install `shared@fab-plugins` at project scope and delete their
+vendored copies — one versioned source of truth. See the plan in
+`docs`/commit history for the drift table.
 
 ## Coexistence with unversioned `~/.claude/skills/`
 
@@ -90,7 +105,9 @@ The conversion + frontmatter normalization is reproducible via `build.py`
 ## Rebuilding
 
 ```bash
-python3 build.py   # re-copies + normalizes from ~/.claude/skills into plugins/
+python3 build.py   # re-copies + normalizes into plugins/
+                    # ~/.claude/skills/ for fab/mesh/quant/strix/ml,
+                    # neural-trader/.claude/skills/ for shared (via REPO_SOURCES)
 ```
 
 ## Out of scope

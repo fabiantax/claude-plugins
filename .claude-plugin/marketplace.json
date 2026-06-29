@@ -31,6 +31,12 @@
       "source": "./plugins/ml",
       "description": "Portable ML eval/bench/training skills: model-guide/picker/quantization, code-bench, niah-bench, llm-eval-overview, thinking-eval, huggingface-workflow, gpu-bench-pipeline, mlflow-experiments, model-training, gepa, skillopt-rust-bugfix.",
       "version": "0.2.0"
+    },
+    {
+      "name": "shared",
+      "source": "./plugins/shared",
+      "description": "Cross-repo-duplicated Claude-Flow community skills reconciled to one canonical (newest) version: github-* (code-review, multi-repo, project/release-management, workflow-automation), swarm-* (advanced, orchestration), skill-builder/creator. Sourced from the neural-trader checkout via build.py. Opt-in.",
+      "version": "0.1.0"
     }
   ]
 }

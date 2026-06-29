@@ -28,6 +28,20 @@ ALLOCATION = {
     "quant": ["fab-swarm-trading","indicator-creator","quant-consult","efficient-frontier","fable-efficient","cosmos-gl","casbin-ecosystem","pi-coding-agent","moshi-best-practices"],
     "strix": ["llama-cpp-rocm","llama-cpp-vulkan","vllm","vllm-internals","model-runtime","rocm-profiling","rdna35-architecture","pytorch-rocm","hipblas-internals","triton-kernels","qwen36-architecture","container-ml-stack","toolbox-ml"],
     "ml": ["model-guide","model-picker","model-quantization","code-bench","niah-bench","llm-eval-overview","thinking-eval","huggingface-workflow","gpu-bench-pipeline","mlflow-experiments","model-training","gepa","skillopt-rust-bugfix"],
+    # `shared` holds cross-repo-duplicated Claude-Flow community skills (github-*,
+    # swarm-*, skill-builder/creator). These do NOT live in ~/.claude/skills — they
+    # are sourced from a repo checkout via REPO_SOURCES (neural-trader = newest set,
+    # the "9/9 certified" generation). See README "shared" section.
+    "shared": ["github-code-review","github-multi-repo","github-project-management","github-release-management","github-workflow-automation","swarm-advanced","swarm-orchestration","skill-builder","skill-creator"],
+}
+
+# Plugins whose skills are sourced from a repo checkout rather than ~/.claude/skills.
+# Maps plugin -> absolute path to that repo's .claude/skills/ dir. The build loop
+# uses REPO_SOURCES[plugin] as the source root when present, else falls back to SRC.
+# Keeps the marketplace reproducible: the source is a named, recorded checkout, not
+# a manual copy.
+REPO_SOURCES = {
+    "shared": "/home/fabian/Developer/personal/neural-trader/.claude/skills",
 }
 
 def slugify(name):
@@ -97,9 +111,11 @@ errors = []
 
 for plugin, skills in ALLOCATION.items():
     plug_skills_dir = os.path.join(REPO, "plugins", plugin, "skills")
+    # repo-sourced plugins (e.g. shared) read skills from a checkout, not ~/.claude/skills
+    src_root = REPO_SOURCES.get(plugin, SRC)
     for skill in skills:
-        src_dir = os.path.join(SRC, skill)
-        src_loose = os.path.join(SRC, skill + ".md")
+        src_dir = os.path.join(src_root, skill)
+        src_loose = os.path.join(src_root, skill + ".md")
         dst_dir = os.path.join(plug_skills_dir, skill)
         # clean dst first so re-runs don't leave stale dupes (e.g. a source's
         # lowercase skill.md / README.md after normalization to SKILL.md).
