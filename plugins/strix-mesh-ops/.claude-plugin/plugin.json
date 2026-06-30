@@ -1,0 +1,10 @@
+{
+  "name": "strix-mesh-ops",
+  "version": "0.1.0",
+  "description": "Diagnostics + autonomy for the A2A mesh / local-inference stack: the mesh-doctor & recon agents, the /mesh-health, /system-recon, /strix-facts and /autonomy skills, and the bundled mesh-health-probe. Turns a fifteen-turn investigation into one call, and encodes decide-and-proceed so you stop asking about reversible choices. Opt-in (host-specific).",
+  "author": { "name": "fabiantax" },
+  "homepage": "https://github.com/fabiantax/claude-plugins",
+  "repository": "https://github.com/fabiantax/claude-plugins",
+  "keywords": ["mesh", "diagnostics", "inference", "autonomy", "recon", "a2a"],
+  "defaultEnabled": false
+}

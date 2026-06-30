@@ -28,6 +28,9 @@ ALLOCATION = {
     "quant": ["fab-swarm-trading","indicator-creator","quant-consult","efficient-frontier","fable-efficient","cosmos-gl","casbin-ecosystem","pi-coding-agent","moshi-best-practices"],
     "strix": ["llama-cpp-rocm","llama-cpp-vulkan","vllm","vllm-internals","model-runtime","rocm-profiling","rdna35-architecture","pytorch-rocm","hipblas-internals","triton-kernels","qwen36-architecture","container-ml-stack","toolbox-ml"],
     "ml": ["model-guide","model-picker","model-quantization","code-bench","niah-bench","llm-eval-overview","thinking-eval","huggingface-workflow","gpu-bench-pipeline","mlflow-experiments","model-training","gepa","skillopt-rust-bugfix"],
+    # Diagnostics + autonomy bundle (agents live in plugins/strix-mesh-ops/agents/,
+    # not built from skills). mesh-health bundles the probe under its scripts/.
+    "strix-mesh-ops": ["mesh-health","system-recon","strix-facts","autonomy"],
     # `shared` holds cross-repo-duplicated Claude-Flow community skills (github-*,
     # swarm-*, skill-builder/creator). These do NOT live in ~/.claude/skills — they
     # are sourced from a repo checkout via REPO_SOURCES (neural-trader = newest set,
