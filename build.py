@@ -23,8 +23,8 @@ def junk_ignore(directory, names):
             if n in JUNK_NAMES or n.endswith(".bak") or ".bak-" in n]
 
 ALLOCATION = {
-    "fab": ["loopit","deliberate","prioritize","ship","plan-and-decompose","visual-plan","visual-recap","quick-recap","catch-up","handover","triz","creative-thinking","creative-thinking-ml","stay-within-limits","rust-decouple","preview","mermaid-local","loop-improvement","svelte-error-handling","svelte-performance","scrapling","emd-optimization"],
-    "mesh": ["fab-agent-runtime","fab-agent-add-mesh","fab-agent-add-peer","mesh-context","graphfusion","gitea","gitea-pm","gitea-bots","woodpecker","bifrost","tensorzero-gateway","openobserve"],
+    "fab": ["loopit","learn","deliberate","prioritize","ship","plan-and-decompose","visual-plan","visual-recap","quick-recap","catch-up","handover","triz","creative-thinking","creative-thinking-ml","stay-within-limits","rust-decouple","preview","mermaid-local","loop-improvement","svelte-error-handling","svelte-performance","scrapling","emd-optimization"],
+    "mesh": ["fab-agent-runtime","fab-agent-add-mesh","fab-agent-add-peer","mesh-context","graphfusion","gitea","gitea-pm","gitea-bots","gitea-ci-mirror","woodpecker","bifrost","tensorzero-gateway","openobserve"],
     "quant": ["fab-swarm-trading","indicator-creator","quant-consult","efficient-frontier","fable-efficient","cosmos-gl","casbin-ecosystem","pi-coding-agent","moshi-best-practices"],
     "strix": ["llama-cpp-rocm","llama-cpp-vulkan","vllm","vllm-internals","model-runtime","rocm-profiling","rdna35-architecture","pytorch-rocm","hipblas-internals","triton-kernels","qwen36-architecture","container-ml-stack","toolbox-ml"],
     "ml": ["model-guide","model-picker","model-quantization","code-bench","niah-bench","llm-eval-overview","thinking-eval","huggingface-workflow","gpu-bench-pipeline","mlflow-experiments","model-training","gepa","skillopt-rust-bugfix"],
