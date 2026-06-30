@@ -37,6 +37,12 @@
       "source": "./plugins/shared",
       "description": "Cross-repo-duplicated Claude-Flow community skills reconciled to one canonical (newest) version: github-* (code-review, multi-repo, project/release-management, workflow-automation), swarm-* (advanced, orchestration), skill-builder/creator. Sourced from the neural-trader checkout via build.py. Opt-in.",
       "version": "0.1.0"
+    },
+    {
+      "name": "strix-mesh-ops",
+      "source": "./plugins/strix-mesh-ops",
+      "description": "Diagnostics + autonomy for the A2A mesh / local-inference stack: mesh-doctor & recon agents, /mesh-health /system-recon /strix-facts /autonomy skills, bundled mesh-health-probe. One-call diagnosis (vs a fifteen-turn investigation) + decide-and-proceed rubric. Opt-in (host-specific).",
+      "version": "0.1.0"
     }
   ]
 }

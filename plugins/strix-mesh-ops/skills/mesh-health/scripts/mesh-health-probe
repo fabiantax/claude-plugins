@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""mesh-health-probe — one-shot, read-only diagnosis of the A2A mesh's inference path.
+
+Encodes the playbook that took ~15 reactive turns to derive by hand (2026-06-30):
+trace a consult A2A endpoint → runtime → exec adapter → inference backend → metric,
+and flag the two failure modes that actually bit us — a dead inference port and a
+too-tight subprocess timeout — plus live-backend health, dead-port references,
+local-load activity, and OpenObserve reachability.
+
+Usage:  mesh-health-probe [--json]
+Stdlib only. Read-only (no mutations). Best-effort: every section degrades safely.
+"""
+import glob
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import urllib.request
+from datetime import datetime
+
+os.environ.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+BRAINS = os.path.expanduser("~/.mesh/brains")
+DEAD_PORTS = {"8002", "8003"}          # decommissioned llama-server ports (llama-swap era)
+TIGHT_TIMEOUT_MS = 120000              # < this is too tight for a 35B consult under load
+MIN_SANE_TIMEOUT_MS = 180000           # the runtime's own default
+
+# Live inference backends a consult can legitimately land on.
+BACKENDS = [
+    ("zai-shim",     4099, "/loadstate",  "Anthropic→OpenAI shim (tier routing)"),
+    ("bifrost",      3003, "/metrics",    "LLM gateway (local-qwen / glm)"),
+    ("llama-router", 8005, "/health",     "local-qwen chokepoint (coder/mesh)"),
+    ("llama-swap",   8007, "/v1/models",  "on-demand backend loader"),
+    ("gemma",        8004, "/health",     "gemma (haiku) — optional/pinned"),
+]
+# adapter → where it sends inference (for the endpoint audit)
+ADAPTER_BACKEND = {
+    "mesh-consult": ("router :8005", "reads MESH_LLM_PORT, default 8005 (was dead 8003)"),
+    "bifrost-fab-agent-runtime": ("bifrost :3003", "via gateway → local-qwen"),
+    "pi-fab-agent-runtime": ("pi default", "interactive pi — heavier"),
+}
+
+
+def _http(url, timeout=4):
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return r.status, r.read().decode("utf-8", "replace")
+    except Exception:
+        return None, None
+
+
+def _tcp(port, host="127.0.0.1", t=1.0):
+    try:
+        with socket.create_connection((host, port), timeout=t):
+            return True
+    except Exception:
+        return False
+
+
+def _sh(args, t=4):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=t).stdout
+    except Exception:
+        return ""
+
+
+def backends():
+    out = []
+    for name, port, path, role in BACKENDS:
+        code, _ = _http(f"http://127.0.0.1:{port}{path}")
+        up = code == 200 or (code is None and _tcp(port))
+        out.append({"name": name, "port": port, "role": role,
+                    "status": "up" if code == 200 else ("listening" if _tcp(port) else "down")})
+    return out
+
+
+def agents():
+    """Audit every mesh agent yaml PER SKILL: pair each handler's exec adapter with
+    its timeout_ms, and flag a tight timeout ONLY on an inference adapter (a fast
+    diagnostic exec like mesh-health-probe legitimately uses a short timeout)."""
+    out = []
+    for y in sorted(glob.glob(f"{BRAINS}/*/agents/*.yaml")):
+        try:
+            text = open(y).read()
+        except Exception:
+            continue
+        # pair each `exec: X` with the nearest following `timeout_ms: N` (before
+        # the next exec) — a yaml may carry several skills with different execs.
+        execs = [(m.start(), os.path.basename(m.group(1))) for m in re.finditer(r"exec:\s*(\S+)", text)]
+        tos = [(m.start(), int(m.group(1))) for m in re.finditer(r"timeout_ms:\s*(\d+)", text)]
+        issues = []
+        adapters = []
+        for i, (pos, exec_name) in enumerate(execs):
+            nxt = execs[i + 1][0] if i + 1 < len(execs) else len(text)
+            tm = next((v for p, v in tos if pos < p < nxt), None)
+            adapters.append(exec_name)
+            if exec_name in ADAPTER_BACKEND and tm is not None and tm < TIGHT_TIMEOUT_MS:
+                issues.append(f"{exec_name} timeout_ms={tm} too tight (35B consults exceed it under load; want ≥{MIN_SANE_TIMEOUT_MS})")
+        primary = next((a for a in adapters if a in ADAPTER_BACKEND), adapters[0] if adapters else None)
+        backend = ADAPTER_BACKEND.get(primary, (primary or "?", ""))[0]
+        out.append({"agent": os.path.basename(y)[:-5], "exec": primary,
+                    "adapters": adapters, "backend": backend, "issues": issues})
+    return out
+
+
+def dead_port_refs():
+    """Scan the inference-handler surface for references to decommissioned ports."""
+    hits = []
+    targets = [os.path.expanduser("~/.local/bin/mesh-consult"),
+               os.path.expanduser("~/.local/bin/pi-fab-agent-runtime")]
+    targets += glob.glob(f"{BRAINS}/*/agents/*.yaml")
+    for f in targets:
+        try:
+            for i, ln in enumerate(open(f), 1):
+                if ln.lstrip().startswith("#"):
+                    continue
+                for p in DEAD_PORTS:
+                    if re.search(rf":{p}\b|\b{p}\b(?=.*(PORT|port|800))", ln):
+                        if re.search(rf"\b{p}\b", ln) and ("port" in ln.lower() or f":{p}" in ln):
+                            hits.append({"file": f.replace(os.path.expanduser("~"), "~"),
+                                         "line": i, "port": p, "text": ln.strip()[:80]})
+        except Exception:
+            pass
+    return hits
+
+
+def activity():
+    out = {"router_coder": None, "router_mesh": None, "bifrost_local_qwen": None}
+    _, m = _http("http://127.0.0.1:8005/metrics")
+    if m:
+        for ln in m.splitlines():
+            if 'routed_total{backend="coder"}' in ln:
+                out["router_coder"] = int(float(ln.split()[-1]))
+            elif 'routed_total{backend="mesh"}' in ln:
+                out["router_mesh"] = int(float(ln.split()[-1]))
+    _, b = _http("http://127.0.0.1:3003/metrics")
+    if b:
+        s = 0.0
+        for ln in b.splitlines():
+            if ln.startswith("bifrost_success_requests_total") and 'provider="local-qwen"' in ln:
+                try:
+                    s += float(ln.split()[-1])
+                except ValueError:
+                    pass
+        out["bifrost_local_qwen"] = int(s)
+    return out
+
+
+def openobserve():
+    """Reachability + credential sanity for the 3 documented OO logins (see
+    docs/oo-local-observability.md). Read-only auth probe only."""
+    import base64
+    checks = [
+        ("strix-metrics", "127.0.0.1:5080", "root@example.com:StrixObserve2026"),
+        ("mac-traces",    "100.109.245.96:5080", "admin@local.dev:admin123456"),
+        ("mesh-acct",     "100.109.245.96:5080", "fabian@raaf.local:raaf2026"),
+    ]
+    out = []
+    for name, hostport, cred in checks:
+        b = base64.b64encode(cred.encode()).decode()
+        code, _ = _http_auth(f"http://{hostport}/api/default/streams", b)
+        out.append({"target": name, "endpoint": hostport,
+                    "auth": "ok" if code == 200 else ("401" if code == 401 else "unreachable")})
+    return out
+
+
+def _http_auth(url, b64, timeout=4):
+    try:
+        req = urllib.request.Request(url, headers={"Authorization": f"Basic {b64}"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, None
+    except urllib.error.HTTPError as e:
+        return e.code, None
+    except Exception:
+        return None, None
+
+
+def build():
+    be = backends()
+    ag = agents()
+    dp = dead_port_refs()
+    issues = []
+    for b in be:
+        if b["name"] in ("llama-router", "llama-swap", "bifrost") and b["status"] == "down":
+            issues.append(f"backend {b['name']} (:{b['port']}) DOWN")
+    issues += [f"{h['file']}:{h['line']} references dead port :{h['port']}" for h in dp]
+    for a in ag:
+        for i in a["issues"]:
+            issues.append(f"{a['agent']}: {i}")
+    return {
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "host": socket.gethostname(),
+        "backends": be, "agents": ag, "dead_port_refs": dp,
+        "activity": activity(), "openobserve": openobserve(),
+        "verdict": {"ok": not issues, "issues": issues},
+    }
+
+
+def main():
+    d = build()
+    if "--json" in sys.argv[1:]:
+        print(json.dumps(d)); return
+    v = d["verdict"]
+    print(f"mesh-health @ {d['host']}  {d['generated_at']}")
+    print("  backends: " + "  ".join(f"{b['name']}:{b['status']}" for b in d["backends"]))
+    ad = {}
+    for a in d["agents"]:
+        ad.setdefault(a["exec"], 0)
+        ad[a["exec"]] += 1
+    print("  agents:   " + ", ".join(f"{k}×{v}" for k, v in ad.items()) + f"  ({len(d['agents'])} total)")
+    print("  activity: router coder=%s mesh=%s · bifrost local-qwen=%s"
+          % (d["activity"]["router_coder"], d["activity"]["router_mesh"], d["activity"]["bifrost_local_qwen"]))
+    print("  openobserve: " + "  ".join(f"{o['target']}:{o['auth']}" for o in d["openobserve"]))
+    if v["ok"]:
+        print("  ✅ verdict: healthy — no dead ports, no tight timeouts, backends up")
+    else:
+        print(f"  ⚠ verdict: {len(v['issues'])} issue(s):")
+        for i in v["issues"]:
+            print(f"     - {i}")
+
+
+if __name__ == "__main__":
+    main()
