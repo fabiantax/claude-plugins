@@ -181,10 +181,14 @@ under-explores an optimization objective. Instead:
    sampling* (different strategies), not iterative refinement of one. Reuse the
    Parallel-execution machinery (below); N≈3–5 (the best-of-5 sweet spot — cap N,
    diminishing returns past ~5).
-2. Each attempt verifies *itself* against the hard gate and records its objective score.
-3. **Discard every attempt that fails the hard gate.** Among survivors, **select the single
-   best objective score.** If none survive, the item FAILs — log it; do not ship a broken
-   "winner".
+2. Each attempt verifies *itself* against the hard gate and reports its objective score —
+   but treat that self-reported number as a **filter, not a ranking**. Parallel attempts run
+   under different contention, so their self-timings routinely mis-rank (observed in testing:
+   the self-reported *fastest* attempt placed *last* under fair measurement).
+3. **Discard every attempt that fails the hard gate.** Then **re-measure all survivors
+   yourself, back-to-back in one run** (same conditions; on a shared GPU, under `gpu-bench`)
+   and **select the single best by *your* measurement** — never the attempts' self-reports.
+   If none survive, the item FAILs — log it; do not ship a broken "winner".
 4. **Commit only the winner** (preserves one-commit-per-item). Record `N`, the per-attempt
    scores, and the winner in the scratchpad so a cold iteration sees the *search*, not just
    the result.
@@ -193,10 +197,13 @@ under-explores an optimization objective. Instead:
 - <ts> [iter N]: OPT-3 best-of-4 → scores [48.1, 51.9✓, 44.0, 50.2]; 1 failed hard gate (NaN); committed 51.9 GFLOP/s (abc1234)
 ```
 
-**Cost discipline.** N attempts cost ≈N× the tokens/GPU of one. Reserve best-of-N for
-**high-value optimization items where attempt quality genuinely varies** — not binary items
-(a test passes or it doesn't; N tries is pure waste) and not low-variance edits. Same
-cheap-by-default ethos as the autonomy envelope above.
+**Cost discipline.** N attempts cost ≈N× the tokens/GPU of one. The payoff scales with **how
+much attempt quality actually varies**: a wide, multi-strategy objective benefits most; a task
+with one obvious win (low variance) barely beats best-of-1, so the N× spend is wasted there
+(observed in testing: 4 attempts on a single-obvious-fix kernel landed within ~3% of each other).
+Reserve best-of-N for **high-value items with a genuinely broad solution space** — not binary
+items (a test passes or it doesn't) and not low-variance edits. Same cheap-by-default ethos as
+the autonomy envelope above.
 
 #### Delegation rules for Reads and research
 
