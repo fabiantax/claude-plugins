@@ -142,11 +142,61 @@ Every item added to the scratchpad — whether in the initial seed or discovered
 - **PASS**: concrete, measurable outcome (e.g. "test X runs green", "grep -c 'bug' returns 0", "artifact contains ≥1 non-boilerplate edit").
 - **FAIL**: the negation or a specific error signal.
 - **"Exists" is not a gate.** "Config file exists" fails to distinguish between an empty template and a correct config. If you can't define a meaningful pass/fail, the item is too vague — split or sharpen it.
+- **Optimization items take *two* gates, not one** — a hard correctness gate plus a soft metric objective. See *Optimization-shaped items* below.
 
 Format in scratchpad:
 ```markdown
 - [ ] L4: Run end-to-end training — PASS: epoch completes with loss < 1.0 / FAIL: epoch crashes or loss diverges
 ```
+
+#### Optimization-shaped items (metric-maximizing, not binary)
+
+Most items have a binary gate (test green / `grep` returns 0). Some instead have an
+**objective to maximize or minimize** — throughput, latency, perplexity, bundle size, a
+benchmark score. These take a different shape. (Source: ComPilot, PACT 2025 — a closed
+loop with grounded *measured* feedback + best-of-N turned an off-the-shelf model into a
+specialist: 2.66× single-run, 3.54× best-of-5, competitive with a SOTA hand-built
+optimizer. arXiv 2511.00592.)
+
+**Two-channel gating — a hard correctness gate UNDER a soft objective.** An optimization
+item carries *two* gates, not one:
+
+- **Hard gate (correctness / legality)** — binary, must hold: the change is still valid
+  (tests green, type-checks, transform is legal, output numerically equivalent). A variant
+  that fails this is discarded outright, *regardless of its score*.
+- **Soft objective (the measured metric)** — the number to improve, read from a **real
+  measurement** (benchmark, profiler, byte count) — never the model's self-estimate.
+
+Never collapse the two into one gate: a loop that optimizes only the metric will "improve"
+into a faster-but-broken state. The hard gate is the floor; the objective is the climb.
+
+```markdown
+- [ ] OPT-3: Tile the matmul loop nest — HARD: `cargo nextest` green (output numerically identical) / SOFT: maximize GFLOP/s (baseline 41.2, target >50)
+```
+
+**Best-of-N — sample in parallel, keep the best survivor.** One sequential chain
+under-explores an optimization objective. Instead:
+
+1. Spawn **N independent attempts from the *same* start state** in parallel — *divergent
+   sampling* (different strategies), not iterative refinement of one. Reuse the
+   Parallel-execution machinery (below); N≈3–5 (the best-of-5 sweet spot — cap N,
+   diminishing returns past ~5).
+2. Each attempt verifies *itself* against the hard gate and records its objective score.
+3. **Discard every attempt that fails the hard gate.** Among survivors, **select the single
+   best objective score.** If none survive, the item FAILs — log it; do not ship a broken
+   "winner".
+4. **Commit only the winner** (preserves one-commit-per-item). Record `N`, the per-attempt
+   scores, and the winner in the scratchpad so a cold iteration sees the *search*, not just
+   the result.
+
+```markdown
+- <ts> [iter N]: OPT-3 best-of-4 → scores [48.1, 51.9✓, 44.0, 50.2]; 1 failed hard gate (NaN); committed 51.9 GFLOP/s (abc1234)
+```
+
+**Cost discipline.** N attempts cost ≈N× the tokens/GPU of one. Reserve best-of-N for
+**high-value optimization items where attempt quality genuinely varies** — not binary items
+(a test passes or it doesn't; N tries is pure waste) and not low-variance edits. Same
+cheap-by-default ethos as the autonomy envelope above.
 
 #### Delegation rules for Reads and research
 
@@ -305,6 +355,7 @@ When a loop hits its gate and the fix belongs elsewhere, don't sit on it: file o
 - Using `/loopit` as a project planner. It's an execution loop. Long-horizon planning belongs in design docs / Jira / ADRs *before* `/loopit` starts.
 - Using `general-purpose` agents when specialists exist. Check `.claude/agents/` and built-in agent types first. Delegate to `Explore` for research, `Plan` for design, domain-specific agents for domain issues.
 - One monolithic agent for multi-topic work. Split into 2-3 focused agents running in parallel.
+- **Best-of-N on a binary item.** Spawning N parallel attempts at a pass/fail item burns N× the budget for no gain — best-of-N is only for metric-maximizing items where attempt quality varies (see *Optimization-shaped items*). Likewise, optimizing a metric with **no hard correctness gate** lets the loop "win" by breaking correctness.
 
 ## Example — first invocation
 
