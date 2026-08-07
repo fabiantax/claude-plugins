@@ -53,7 +53,11 @@ If they already exist (re-entrant invocation), **read them first** and continue.
 
 ## Items
 - [ ] <item-id>: <imperative, one outcome each> — PASS: <observable gate> / FAIL: <observable condition>
+- [ ] <item-id>: <imperative> — blocked-by: <item-id>[, <item-id>] — PASS: <gate> / FAIL: <condition>
 - [x] <done-item>: <result> (iteration <N>, <YYYY-MM-DD>)
+
+## Ruled out (approaches disproven — do NOT retry)
+- <approach> — <the evidence that killed it, with file:line or a command's output> (iteration <N>)
 
 ## Findings (newest at top, max 20 retained)
 - <YYYY-MM-DD HH:MM> [iter N]: <one-line learning that the next iteration must know>
@@ -64,6 +68,27 @@ If they already exist (re-entrant invocation), **read them first** and continue.
 ## Recent runs (5 max, newest first)
 - <YYYY-MM-DD HH:MM> [iter N]: <items closed>; <items deferred>; <findings added: count>
 ```
+
+**`blocked-by:` is what makes the parallel-execution section below usable.** That
+section says to run items in parallel "when independent (no blockedBy)", but
+without this field the scratchpad cannot express the edge, so every iteration has
+to re-derive the ordering from prose and defaults to running items one at a time.
+
+Dependencies here are **discovered, not planned**: an item is rarely known to
+block another until one of them is attempted. So do not try to author the whole
+graph at seed time — seed items flat, and *add* `blocked-by:` the moment an
+iteration learns of an edge. A seed-time graph is usually wrong, and a wrong
+graph is worse than none because it serialises work that could have run in
+parallel.
+
+**`Ruled out` is not `Blockers` and not an ADR.** Blockers are things that need
+unblocking; ADRs record the option that was *chosen*. This section records
+approaches **proven dead, with the evidence** — the thing a cold-start iteration
+most needs in order not to spend an hour rediscovering that option B cannot
+work. If you disprove an approach, write it here even when the item still
+succeeds by another route. An entry without concrete evidence (a `file:line`, a
+compiler error, a measured number) is not usable by the next iteration — it is
+just an opinion, and the next iteration will reasonably retry the approach.
 
 #### `adr.md` shape
 
@@ -90,14 +115,17 @@ The prompt is a single self-contained block the model fires each turn. Build it 
 ```
 /loop <one-line goal restatement>. Read .loopit/<slug>/scratchpad.md and .loopit/<slug>/adr.md before doing anything; they are the load-bearing memory across iterations. Each iteration:
 
-1. Read both files cold.
-2. Pick the first unchecked item in scratchpad. If none remain, run the diagnostic pass: <project-specific git grep / file scan / test re-run that surfaces new items, OR a single line "no items, propose convergence">.
+1. Read both files cold. Read `Ruled out` too — do not retry an approach listed there.
+2. Pick the first unchecked item whose `blocked-by:` items are all checked. If none remain, run the diagnostic pass: <project-specific git grep / file scan / test re-run that surfaces new items, OR a single line "no items, propose convergence">.
 3. Apply the change.
-4. Verify with: <one concrete command — e.g. `dotnet build && pwsh ./scripts/web.e2e/headless.ps1 -Filter <X>`>. Quality gate must be green.
-5. If a non-trivial choice was made (>=2 viable options, one chosen), append an ADR entry to .loopit/<slug>/adr.md with date, alternatives, decision, why, consequences.
+4. Verify with: <one concrete command — e.g. `dotnet build && pwsh ./scripts/web.e2e/headless.ps1 -Filter <X>`>. Capture the tool's OWN exit code — never a pipeline's:
+       <cmd> > /tmp/loopit-verify.log 2>&1; echo "EXIT=$?"
+   Then read the log. `<cmd> | tail` reports `tail`'s status, and `| grep` exits 1 when it matches nothing, so a clean run can read as failure and a failed run as success. Quote BOTH the `EXIT=` line and a result line (`N tests run`, `N passed`) in the finding or run entry. A green claim with no quoted exit code and no result count does not count as verified.
+   Confirm the command actually RAN what you think: a build that fails to compile a test target can look much like a pass at a glance.
+5. If a non-trivial choice was made (>=2 viable options, one chosen), append an ADR entry to .loopit/<slug>/adr.md with date, alternatives, decision, why, consequences. If an option was **disproven** (not merely unchosen), add it to `Ruled out` with the evidence.
 6. Append a finding to scratchpad if anything was surprising or non-obvious — newest at top, prune at 20 entries.
 7. Mark the item done with iteration number + date; update Status block.
-8. Commit per item by default with subject "<short-prefix>: <item summary>". Skip the commit if the change is trivial scratchpad edits.
+8. Commit — and push — BEFORE starting the next item. Subject "<short-prefix>: <item summary>". This is not optional and not deferrable to the end of the iteration: uncommitted work in a scratch worktree can be reaped, and a long verification run is exactly when that happens. Skip only for trivial scratchpad-only edits.
 
 INVARIANTS (do NOT violate):
 - <invariant 1 — quality gate, e.g. "tests must remain green; revert on red">
@@ -105,7 +133,7 @@ INVARIANTS (do NOT violate):
 - <invariant 3 — safety, e.g. "do not push to shared branches; do not modify other worktrees' processes">
 - <invariant N>
 
-CONVERGENCE: stop when (a) all items checked AND (b) the diagnostic pass produces zero new items AND (c) the verification command is green for two consecutive iterations.
+CONVERGENCE: stop when (a) all items checked AND (b) the diagnostic pass produces zero new items AND (c) the verification command is green for two consecutive iterations. An item whose `blocked-by:` can never clear (the blocker is outside this loop's control) does NOT hold convergence open — move it to Blockers, note what would unblock it, and leave it unchecked; otherwise one external dependency pins the loop open forever.
 
 INITIAL SEED: <bullet list of starting items — must give iteration #1 something concrete to do>
 ```
@@ -114,11 +142,23 @@ INITIAL SEED: <bullet list of starting items — must give iteration #1 somethin
 
 **Always execute unless the user says "draft only".** Do not ask — just start running.
 
+#### Outer-driver variants (don't double-loop)
+
+The `/loop` prompt is only one possible outer driver. If a **`/goal` Stop-hook is
+already active** (or any harness mechanism that re-invokes until a condition
+holds), do NOT layer a `/loop` on top — two drivers fight over convergence.
+The hook IS the loop; loopit still contributes everything else: the state files
+(scratchpad + ADR), item pass/fail gates, `Ruled out`, and the convergence
+report. Note in the scratchpad `## Status` block which driver owns iteration
+(e.g. `Goal-hook: active — no separate /loop`), so a cold session doesn't arm a
+second driver.
+
 In **execute** mode:
 
 #### Per-iteration cycle
 
 1. Read scratchpad + ADR.
+1a. **Re-verify the load-bearing "done" claims you are about to build on.** State files record *conclusions*, not ground truth, and a conclusion that was wrong when written stays wrong and confident forever. Before an item depends on "X shipped / Y merged / Z closed / the fix is on main", re-check it against live state — and check it **by name against the authoritative source**, not against whatever a working tree or a cached ref happens to hold. (2026-07-31: a converged loop's scratchpad said two fixes had shipped and a PR was safely closed as superseded; the "proof" had been a grep of a working tree sitting on a *mirror's* head, not the source-of-truth remote. The fixes were never upstream and the next mirror push would have reverted them.) Cheap and specific beats thorough: one `git log -1 <remote>/<branch>`, one API read of the issue state, one `systemctl is-active`. If a re-check contradicts the state file, **correct the file and any memory that repeats it in the same iteration** — a stale conclusion left in place will be re-consumed by the next iteration and by the next session.
 2. Pick the first unchecked item.
 3. **Pre-flight gate**: before writing code or running a target command, enumerate the full required-input surface (config keys, abstract methods, env vars, CLI flags). Delegate to an `Explore` agent if the surface spans >1 file or >300 lines total. **Do not guess.** The pre-flight output replaces the "discover one missing key, fail, repeat" anti-pattern with one informed execution.
 4. Mark the item `in progress` with iteration N and timestamp.
@@ -148,6 +188,18 @@ Format in scratchpad:
 ```markdown
 - [ ] L4: Run end-to-end training — PASS: epoch completes with loss < 1.0 / FAIL: epoch crashes or loss diverges
 ```
+
+#### Budget for verification to *change* the finding, not just confirm it
+
+Treat the verification step as a source of findings in its own right, not a formality that ratifies what analysis already concluded. Analysis reads code and infers; verification executes and observes — and when they disagree, verification is right. Plan for that outcome instead of being derailed by it: leave room in the iteration for "the check overturned the claim", and when it does, the overturning **is** the deliverable.
+
+Three shapes this took in one session (2026-07-31, GraphFusion memory epic):
+
+- **An adversarial reviewer killed a finding on one character.** "This collects the whole dataset, doubling peak memory" was refuted because the loop consumes the vector *by value*, so each batch drops as it advances — peak is `max(a, b)`, not `a + b`. The claimed multi-GB saving was zero. Two more died the same way: a "nothing calls this cleanup" claim whose caller lived in a *downstream repo* invisible to a workspace grep, and an unbounded-growth claim whose write path no shipped long-lived process can reach. Common shape: **a correct mechanism with a cost model that never materialises.** Trace the call path to the top before costing anything.
+- **A benchmark measured the wrong thing, and the absurdity was the tell.** It reported "5 properties = 4.0 bytes/node" — impossible, which is why it got caught. The fixture builder took its input *by value*, so the measured closure captured only the move, not the allocation. Had it read 40 bytes it would have shipped. Sanity-check every number against physics (a latency ladder, a size bound) *before* interpreting it.
+- **A test disproved the code-read that motivated it.** An agent reported "this keyword is handled in the top-level path"; the regression guard it then wrote failed, revealing that path was dead code too — the feature had never worked anywhere. The stronger finding existed only because someone wrote the test.
+
+Practical consequences for item gates: prefer gates that *execute* over gates that *inspect*; when an item's evidence is "I read the code", its gate is not satisfied until something ran; and when a verification contradicts a recorded finding, correct the scratchpad, the issue, and any memory in the same iteration — a superseded claim left in place gets re-consumed downstream as fact.
 
 #### Optimization-shaped items (metric-maximizing, not binary)
 
@@ -251,6 +303,13 @@ When an iteration's item is multi-stage or fans out, author a Workflow instead o
 
 #### Agent monitoring rules
 
+- **Brief changed mid-flight? Message the agent, don't respawn.** When the user
+  (or new evidence) changes the brief while delegated agents are running, send
+  the **delta** to the affected agent (SendMessage / mailbox) instead of killing
+  and respawning — a respawn loses its partial context and repays the whole
+  ramp-up cost. Mark the delta clearly as an addendum ("supersedes X if in
+  conflict"), and log the same delta as a scratchpad Finding *immediately*, so a
+  cold restart knows the original prompt is no longer the full brief.
 - **Never say "still writing" passively.** If a background agent hasn't completed in 60 seconds, check its output. If stalled (>2 min without progress), kill and restart with a clearer prompt.
 - **Split large agent tasks.** If an agent's scope covers 3+ distinct topics, split into 2-3 agents running in parallel instead of one monolithic agent.
 - **Verify agent output.** After an agent completes, read the actual files it wrote — don't just trust its summary.
@@ -260,10 +319,15 @@ When an iteration's item is multi-stage or fans out, author a Workflow instead o
 
 #### Parallel execution
 
-When multiple items are independent (no blockedBy), execute them in parallel:
+When multiple items are independent — none carries a `blocked-by:` naming an
+unchecked item (see the Items schema) — execute them in parallel:
 - Spawn one agent per item in a single message
 - Use `run_in_background: true` for agents that don't block the next step
 - Sync results after all parallel agents complete
+- **Check file scope, not just `blocked-by:`.** Two items with no dependency edge
+  can still both edit the same file, and then the second agent's write silently
+  loses the first's. `blocked-by:` records *logical* order; overlapping file
+  scope is an independent reason to serialise.
 - **Concrete pattern that works**: for a multi-file implementation item, split by file scope into 3 focused coder agents (e.g. A=dataloader+evaluator, B=rollout, C=adapter+train_patch), all running in parallel, each verifying independently.
 
 #### Fill CI/verification waits — start other stories instead of idling
@@ -363,6 +427,9 @@ When a loop hits its gate and the fix belongs elsewhere, don't sit on it: file o
 - Using `general-purpose` agents when specialists exist. Check `.claude/agents/` and built-in agent types first. Delegate to `Explore` for research, `Plan` for design, domain-specific agents for domain issues.
 - One monolithic agent for multi-topic work. Split into 2-3 focused agents running in parallel.
 - **Best-of-N on a binary item.** Spawning N parallel attempts at a pass/fail item burns N× the budget for no gain — best-of-N is only for metric-maximizing items where attempt quality varies (see *Optimization-shaped items*). Likewise, optimizing a metric with **no hard correctness gate** lets the loop "win" by breaking correctness.
+- **Trusting a green you didn't actually read.** `cmd | tail` reports `tail`'s exit code, `| grep` exits 1 on no-match, and a harness that surfaces "exit 0" is reporting the *pipeline*. Observed repeatedly: a build returning 101 reported as success, and a "crate checks clean" claim written into a PR that had never been established. Capture `EXIT=$?` straight off the tool and quote it. **Being rigorous about others' claims while credulous about your own is the failure mode** — apply the same standard to your own verification that you apply to a bug report.
+- **Sitting on uncommitted green work.** Finishing an item, then spending the next stretch on further verification before committing. Scratch worktrees get reaped; a long verification run is exactly the window in which it happens. Commit and push the moment the gate is green, then verify further.
+- **Retrying a disproven approach.** If `Ruled out` is empty after an iteration that eliminated options, the elimination work is lost and the next cold start will redo it. Record the approach *and the evidence*, not just the conclusion.
 
 ## Example — first invocation
 

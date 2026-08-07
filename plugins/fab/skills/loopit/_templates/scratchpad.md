@@ -16,7 +16,15 @@
 
 ## Items
 - [ ] <smallest next unit of work>
+- [ ] <unit that cannot start yet> — blocked-by: <item-id>[, <item-id>]
 - [ ] <…>
+
+## Ruled out (approaches disproven — do NOT retry)
+- none
+<!-- One line per dead approach, WITH the evidence that killed it (file:line, a
+     compiler error, a measured number). "X won't work" without evidence is an
+     opinion, and the next cold-start iteration will reasonably retry it.
+     Distinct from Blockers (need unblocking) and ADRs (the option chosen). -->
 
 ## Findings (newest at top, max 20 retained)
 - <YYYY-MM-DD> [iterN, <tag>]: <what was learned + evidence. Drop oldest past 20.>
