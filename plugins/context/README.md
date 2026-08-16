@@ -4,12 +4,17 @@ A CLAUDE.md is paid for in **every session, on every task, in that repo**. Most 
 it is reference material a given task never touches, and a meaningful slice is
 *prohibitions* — rules that would be better enforced than remembered.
 
-This plugin does two things:
+This plugin does three things:
 
 1. **`guard.py`** — a `PreToolUse` hook that denies a Bash command when it
    violates a rule declared in `.claude/guards.toml`, returning the reason.
-2. **`doctor.py`** — reports what a repo's CLAUDE.md costs and which sections are
-   prohibition-dense enough to be worth converting.
+2. **`doctor.py`** — reports what a repo's CLAUDE.md costs and which of its rules
+   could be *enforced* instead of stated.
+3. **`split.py`** — moves the *reference* half out to a sidecar the agent reads
+   on demand, verbatim, and proves the move lost nothing.
+
+Those are the two halves of the bill. `doctor` and `guard` deal with the rules;
+`split` deals with everything that is *not* a rule — usually most of the file.
 
 On the host it was built for, this took a session from **9,150 to 1,386 resident
 tokens (−85%)** while making the enforced rules categorical instead of
@@ -32,9 +37,15 @@ Real output, on a repo that had never been touched:
 
 ```
   resident cost: 15574 tok, every session, every task in this repo
-     2881 tok   18%  Multi-agent parallelization   <- prohibition-dense
-     2738 tok   18%  Rules                         <- prohibition-dense
-  mechanisable (prohibition-dense): 9565 tok = 61% of the file
+
+  where it sits:
+     2881 tok   18%  Multi-agent parallelization
+     2738 tok   18%  Rules
+     2018 tok   13%  Tooling workflow (mandatory for all coding agents)
+
+  ENFORCEABLE-RULE CANDIDATES: 18
+  combined cost of those lines: 1837 tok (11.8% of the file)
+  ^ this is the realistic ceiling for conversion, not the section total.
 ```
 
 It reports a **count of candidate rules**, not a percentage of the file, because
@@ -52,6 +63,53 @@ An earlier version counted prohibition words per *section* and reported the whol
 section's tokens as mechanisable. It claimed **61% of the pilot file** when the
 honest answer was five rules — overstating by roughly 6x, because converting one
 rule inside a 2,881-token section frees the rule's lines, not the section.
+
+## Splitting the reference out
+
+Enforcing rules only ever addresses the rules. On a real 15,574-token manual the
+*enforceable* lines came to 1,837 tok — the other 87% was reference the agent
+pays for in every session and reads in almost none.
+
+```bash
+python3 split.py CLAUDE.md                                  # inventory + chunk ids
+python3 split.py CLAUDE.md --core-ids core.txt \
+    --out-core CLAUDE.md --out-sidecar docs/claude-md-sections.md
+```
+
+**The only question worth asking per chunk** is not "is this important" — all of
+it is. Ask what the chunk costs you when you *don't* read it:
+
+- **Resident** — a rule you can violate *without knowing to look it up*. Capital
+  safety, silent-corruption traps, standing authorizations, honesty gates. No
+  index and no search rescues a wrong call here: retrieval cannot save you from a
+  rule you never thought to fetch.
+- **Sidecar** — what you would naturally look up *once the task touches it*.
+  Inventories, layouts, tool post-mortems, orchestration mechanics.
+
+Because **insurance is a property of a rule, not of the section around it**, the
+inventory chunks at H3 as well as H2, so one surviving rule can be rescued out of
+a 2,018-token post-mortem and the rest still moves.
+
+Everything moves **verbatim**, and the tool **refuses to write** unless every
+non-blank line of the original appears in exactly one of the two files. That
+check is the point: an unverifiable split of a file full of hard-won safety rules
+is not worth the tokens it saves. Finer line-level surgery compresses more and
+cannot be checked this way, so it isn't offered.
+
+Measured on that manual: **15,574 → 7,211 tok resident (−54%)**, 0 lines lost.
+
+### The check worth wiring into CI
+
+The split is a one-off; the risk is permanent, because the next edit can quietly
+move a capital rule into the sidecar and nothing will complain.
+
+```bash
+python3 split.py CLAUDE.md --assert-resident insurance.txt
+```
+
+`insurance.txt` is one string per line — the rules that must never leave. On the
+repo above it reads 10/10 against the core and 0/10 against the sidecar, so it
+discriminates rather than passing by default.
 
 ## Declaring guards
 
@@ -110,5 +168,5 @@ categorical.
 ## Tests
 
 ```bash
-cd hooks && python3 -m pytest test_guard.py test_doctor.py -q
+cd hooks && python3 -m pytest test_guard.py test_doctor.py test_split.py -q
 ```
