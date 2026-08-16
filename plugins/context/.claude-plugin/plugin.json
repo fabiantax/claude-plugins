@@ -1,0 +1,8 @@
+{
+  "name": "context",
+  "version": "0.1.0",
+  "description": "Context-budget tooling for CLAUDE.md. Enforces mechanisable rules at the tool layer (PreToolUse guards) instead of carrying them as resident prose, and reports what a repo's manual actually costs. Inert until a repo declares .claude/guards.toml — enabling it globally is safe. On the host it was built for, it took a session from 9,150 to 1,386 resident tokens (-85%) while making the enforced rules categorical rather than probabilistic.",
+  "author": { "name": "fabiantax" },
+  "homepage": "https://github.com/fabiantax/claude-plugins",
+  "repository": "https://github.com/fabiantax/claude-plugins"
+}

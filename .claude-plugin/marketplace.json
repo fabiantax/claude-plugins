@@ -1,6 +1,8 @@
 {
   "name": "fab-plugins",
-  "owner": { "name": "fabiantax" },
+  "owner": {
+    "name": "fabiantax"
+  },
   "plugins": [
     {
       "name": "fab",
@@ -43,6 +45,11 @@
       "source": "./plugins/strix-mesh-ops",
       "description": "Diagnostics + autonomy for the A2A mesh / local-inference stack: mesh-doctor & recon agents, /mesh-health /system-recon /strix-facts /autonomy skills, bundled mesh-health-probe. One-call diagnosis (vs a fifteen-turn investigation) + decide-and-proceed rubric. Opt-in (host-specific).",
       "version": "0.1.0"
+    },
+    {
+      "name": "context",
+      "source": "./plugins/context",
+      "description": "Enforce mechanisable CLAUDE.md rules at the tool layer instead of carrying them as resident prose. Inert until a repo declares .claude/guards.toml."
     }
   ]
 }
