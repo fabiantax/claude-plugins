@@ -1,0 +1,94 @@
+# Declarative guards — rules enforced at the tool-call layer instead of stated in
+# prose. Each entry replaces text that was resident in ~/CLAUDE.md (gitea #87).
+#
+# WHY THIS FILE EXISTS
+# Measured on this host (#85): a rule stated in the prompt is followed
+# probabilistically. "Prompts Don't Protect" (arXiv:2605.18414) puts unauthorized
+# tool invocation at 48.5-68.5% ungated, 4.0-37.0% with the rule in the prompt,
+# and 0% enforced at the tool layer. And some rules cannot be retrieved from a
+# prompt even in principle — `gpu-bench` is triggered by an action, not by
+# anything the user says.
+#
+# FORMAT
+#   [[deny]]     block the command outright
+#   [[require]]  block unless `unless` also matches (a precondition)
+# Both take `match` (Python regex, searched against the full command string),
+# `why` (surfaced verbatim to the agent), and `id`.
+#
+# SAFETY CONTRACT
+# The runner is fail-open: any parse error, any exception, any unreadable config
+# means ALLOW. A guard that cannot be evaluated must never block real work.
+# Patterns are matched against the whole command line, so anchor carefully —
+# an over-broad pattern is worse than a missing guard.
+
+# --- Hard nevers ------------------------------------------------------------
+
+[[deny]]
+id = "podman-storage-symlink"
+match = '\b(rm|mv|rmdir)\b[^|;&]*\.local/share/containers/storage'
+why = "~/.local/share/containers/storage is a symlink to /mnt/models/podman-storage and IS the entire mechanism. Replacing it with a real directory silently shadows every image and breaks gitea, sqld, garage, prometheus, grafana and open-webui."
+
+[[deny]]
+id = "pkill-f-llama-server"
+match = 'pkill\s+-[a-zA-Z0-9]*f[a-zA-Z0-9]*\s[^|;&]*llama-server'
+why = "Use `pkill -x llama-server`. `pkill -f` matches the whole command line, so it kills bash scripts containing the string — including your own shell (observed: bare exit 144)."
+
+[[deny]]
+id = "onpath-symlink-overwrite"
+match = '\b(mv|cp|rm)\b[^|;&]*(\.local/bin/(strix-llama|strix-build|gpu-bench)|~/CLAUDE\.md|/home/fabian/CLAUDE\.md)(\s|$)'
+why = "strix-llama, strix-build, gpu-bench and ~/CLAUDE.md are symlinks into git repos. Edit the repo file and commit there — overwriting the on-PATH symlink silently diverges the live tool from its tracked source."
+
+# REMOVED: llamacpp-upstream-push.
+# Two independent reasons, both found by testing against 9,189 real commands:
+#   1. The pattern matched EVERY `git push` (163 real commands) because the path
+#      component was optional. A guard that blocks all pushes is far worse than
+#      the rule it enforces.
+#   2. It is unexpressible from argv anyway — the agent `cd`s into the repo, so
+#      the path never appears in the command string.
+#   3. It is redundant: that clone's push URL is already disabled in git config,
+#      so `git push` fails there by construction. The enforcement exists one
+#      layer down and needs no guard.
+
+[[deny]]
+id = "startup-llm-vs-llama-swap"
+match = 'startup\s+llm/(mtp|batched)'
+why = "Do not run `startup llm/mtp` or `llm/batched` alongside llama-swap — port and GTT conflict. llama-swap on :8007 is the serving path."
+
+# --- PR / merge non-negotiables --------------------------------------------
+
+[[deny]]
+id = "protected-force-push"
+match = 'git\s+push[^|;&]*(--force(?!-with-lease)|(\s|^)-f(\s|$))[^|;&]*\b(main|master|develop)\b'
+why = "Never force-push a protected branch. Use --force-with-lease on a feature branch only."
+
+[[deny]]
+id = "merge-gate-bypass"
+# ANCHORED TO INVOCATION, NOT MENTION. The first version matched the bare flag
+# names anywhere in the command, so writing documentation *about* these guards
+# tripped it — caught in production, on the very commit that added this file,
+# twice. A guard that fires when a rule is merely discussed is a false positive
+# by construction, and it is a self-blocking one: it prevents its own repair
+# through the tool it intercepts.
+# Each alternative below now requires the surrounding command that actually uses
+# the flag, so prose that names it is allowed and use of it is not.
+match = '(git\s+(commit|push)[^|;&]*--no-verify|"force_merge"\s*:\s*true|\bgh\s+pr\s+[a-z]+[^|;&]*--admin)'
+why = "Never bypass the green-CI merge gate. Red CI means stop and report, not force through."
+
+[[deny]]
+id = "gh-pr-merge-on-mirrored-repo"
+match = 'gh\s+pr\s+merge'
+why = "These repos are Gitea source-of-truth with an hourly push-mirror to GitHub; a GitHub-side merge is clobbered within ~1h. Merge via the Gitea API instead."
+
+[[deny]]
+id = "commit-identity-override"
+match = 'git\s+(-c\s+user\.(email|name)=|commit[^|;&]*(--author=|--reset-author))'
+why = "Never override commit identity. Commit with a plain `git commit -m` and let the configured identity apply."
+
+# --- GPU coordination -------------------------------------------------------
+# The rule retrieval could never find: triggered by the action, not the wording.
+
+[[require]]
+id = "gpu-exclusive-under-gpu-bench"
+match = '(llama-bench|llama-perplexity|llama-server-strix)\b[^|;&]*(-m\s|--model\s)'
+unless = 'gpu-bench'
+why = "GPU-exclusive ops must run under `gpu-bench` on this shared box — it drains the gateway, waits for the slots to idle, and holds an exclusive flock. Running raw collides with other agents' jobs and contaminates the numbers."
