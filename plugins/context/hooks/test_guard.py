@@ -24,9 +24,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import guard  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# The plugin ships NO active config — rules are per-repo, and a repo that has not
-# opted in gets no rules at all. Tests run against the worked example, which
-# doubles as a check that the shipped example stays valid and false-positive-free.
+# The plugin ships NO active config — rules are per-repo. Tests run against the
+# worked example, which doubles as a check that it stays valid.
 CFG = os.path.normpath(os.path.join(HERE, "..", "examples", "guards.toml"))
 
 
@@ -38,7 +37,14 @@ def rules():
 
 
 def ev(rules, cmd):
-    return guard.evaluate(cmd, *rules)
+    """Evaluate with a cwd inside a Gitea-mirrored repo — the historical default,
+    so every pre-existing test keeps exercising the scoped rules too."""
+    return guard.evaluate(cmd, *rules,
+                          cwd="/home/fabian/Developer/local-llm-lab/strix-inference")
+
+
+def ev_cwd(rules, cmd, cwd):
+    return guard.evaluate(cmd, *rules, cwd=cwd)
 
 
 # --- true positives: each must block -----------------------------------------
@@ -90,6 +96,34 @@ def test_legitimate_command_is_allowed(rules, cmd):
 
 
 # --- fail-open contract -------------------------------------------------------
+
+def test_cwd_scoped_rule_only_fires_where_its_reason_holds(rules):
+    """WHY: `gh pr merge` is WRONG on a Gitea-mirrored repo and RIGHT on a
+    GitHub-native one. Without cwd_match the rule fired on claude-plugins — a
+    real false positive, caught live. Deleting cwd_match from the rule makes the
+    second assertion fail."""
+    mirrored = "/home/fabian/Developer/local-llm-lab/strix-inference"
+    native = "/home/fabian/Developer/personal/claude-plugins"
+    cmd = "gh pr merge 3 --squash"
+    assert ev_cwd(rules, cmd, mirrored) is not None, "must block on a mirrored repo"
+    assert ev_cwd(rules, cmd, native) is None, "must ALLOW on a GitHub-native repo"
+
+
+def test_unscoped_rules_still_apply_everywhere(rules):
+    """WHY: adding cwd_match must not accidentally scope the rules that have
+    none — those protect the machine regardless of which repo you are in."""
+    for cwd in ("/tmp", "/home/fabian/Developer/personal/claude-plugins", ""):
+        assert ev_cwd(rules, "pkill -f llama-server", cwd) is not None, \
+            "unscoped rule must fire in %r" % cwd
+
+
+def test_unusable_cwd_pattern_does_not_fire(rules):
+    """WHY: a broken scope must fail CLOSED for the rule (skip it), not fall
+    back to firing everywhere — a typo'd scope should lose enforcement, never
+    gain it."""
+    bad = [{"id": "x", "match": "anything", "cwd_match": "([unclosed", "why": "w"}]
+    assert guard.evaluate("anything", bad, [], "/tmp") is None
+
 
 def test_unreadable_config_fails_open():
     """WHY: the guard runs on every Bash call. An unreadable config must allow,
@@ -156,9 +190,6 @@ def test_deny_emits_the_json_contract():
     workaround. Verified live on this host 2026-08-16."""
     payload = json.dumps({"tool_name": "Bash",
                           "tool_input": {"command": "pkill -f llama-server"}})
-    # CLAUDE_GUARDS_CONFIG must be explicit: the subprocess would otherwise find
-    # no repo config and correctly allow, which is the inertness behaviour tested
-    # separately above.
     env = dict(os.environ, CLAUDE_GUARDS_CONFIG=CFG)
     p = subprocess.run([sys.executable, os.path.join(HERE, "guard.py")],
                        input=payload, capture_output=True, text=True, env=env)

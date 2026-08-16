@@ -119,16 +119,45 @@ def load_rules(path: str):
     return deny, req
 
 
-def evaluate(command: str, deny, require):
+def _in_scope(rule, cwd: str) -> bool:
+    """Optional `cwd_match`: apply the rule only where its premise actually holds.
+
+    Added after a live false positive. A rule forbidding a GitHub-side merge
+    exists because most repos on that host are Gitea source-of-truth with a
+    push-mirror — but it fired in a GitHub-NATIVE repo, where that same command
+    is the correct tool. The guard blocked the right action for a reason that did
+    not apply.
+
+    A rule whose justification is repo-specific must say so, or it fires wherever
+    its words match rather than wherever its reason holds. Rules with no
+    `cwd_match` apply everywhere, as before.
+
+    A broken `cwd_match` fails CLOSED for that rule — skipped, not applied
+    everywhere — so a typo'd scope loses enforcement instead of gaining it.
+    """
+    pat = rule.get("cwd_match")
+    if not pat:
+        return True
+    try:
+        return bool(re.search(pat, cwd or ""))
+    except re.error:
+        return False
+
+
+def evaluate(command: str, deny, require, cwd: str = ""):
     """-> (rule_id, why) for the first violated rule, else None. Never raises."""
     for r in deny:
         try:
+            if not _in_scope(r, cwd):
+                continue
             if r.get("match") and re.search(r["match"], command):
                 return r.get("id", "deny"), r.get("why", "blocked by guard")
         except re.error:
             continue                                     # bad pattern => allow
     for r in require:
         try:
+            if not _in_scope(r, cwd):
+                continue
             if not (r.get("match") and re.search(r["match"], command)):
                 continue
             unless = r.get("unless")
@@ -163,7 +192,8 @@ def main() -> int:
         deny_rules, require_rules = load_all(config_paths())
         if not deny_rules and not require_rules:
             return 0                                     # no repo opted in
-        hit = evaluate(command, deny_rules, require_rules)
+        cwd = data.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or ""
+        hit = evaluate(command, deny_rules, require_rules, cwd)
         if hit:
             deny(*hit)
     except Exception:                                    # noqa: BLE001

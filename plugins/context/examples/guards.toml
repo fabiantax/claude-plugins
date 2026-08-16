@@ -76,8 +76,20 @@ why = "Never bypass the green-CI merge gate. Red CI means stop and report, not f
 
 [[deny]]
 id = "gh-pr-merge-on-mirrored-repo"
-match = 'gh\s+pr\s+merge'
-why = "These repos are Gitea source-of-truth with an hourly push-mirror to GitHub; a GitHub-side merge is clobbered within ~1h. Merge via the Gitea API instead."
+# ANCHORED TO A COMMAND POSITION, and scoped by cwd below. The bare pattern
+# matched the phrase anywhere, so writing a PR body that mentions it tripped the
+# guard — the fourth mention-vs-invocation false positive in this rule set.
+# Requiring a command boundary (start, or after ; && || newline) means prose
+# naming the command is allowed and running it is not.
+match = '(^|[;&|]\s*|\n\s*)gh\s+pr\s+merge'
+# SCOPED, because the justification is repo-specific. This fired on
+# `claude-plugins`, which is GitHub-NATIVE (one remote, github.com, no Gitea) —
+# there `gh pr merge` is the correct tool and the guard blocked the right action
+# for a reason that did not apply. A rule whose reason is repo-specific must say
+# so, or it fires wherever the words match rather than wherever the reason holds.
+# Listed repos are the Gitea source-of-truth ones with an hourly push-mirror.
+cwd_match = '/(strix-inference|fab-agent-runtime|GraphFusion|fab-trader|Atlas|atlas|fab-agent-mesh)(/|$)'
+why = "This repo is Gitea source-of-truth with an hourly push-mirror to GitHub; a GitHub-side merge is clobbered within ~1h. Merge via the Gitea API instead."
 
 [[deny]]
 id = "commit-identity-override"
