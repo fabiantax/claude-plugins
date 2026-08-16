@@ -37,10 +37,21 @@ Real output, on a repo that had never been touched:
   mechanisable (prohibition-dense): 9565 tok = 61% of the file
 ```
 
-The heuristic counts prohibition words. It is a **prompt for review, not a
-verdict** — only you can say whether a rule is a predicate over a command or a
-matter of judgement. Judgement does not mechanise; authorisation tiers, working
-principles and taste stay prose.
+It reports a **count of candidate rules**, not a percentage of the file, because
+the count is what you then have to audit. A candidate needs BOTH an obligation
+("never", "requires", "always") AND a command-shaped literal — a command, flag,
+path or env assignment. A prohibition with no command in it is judgement, and
+judgement does not mechanise.
+
+**Calibrated against two real repos**: on the pilot it surfaced 18 candidates, of
+which 5 survived audit and shipped — and it finds all 5. On a repo whose rules
+were already converted it reports 1 (a known false positive: a filename
+mentioned in prose).
+
+An earlier version counted prohibition words per *section* and reported the whole
+section's tokens as mechanisable. It claimed **61% of the pilot file** when the
+honest answer was five rules — overstating by roughly 6x, because converting one
+rule inside a 2,881-token section frees the rule's lines, not the section.
 
 ## Declaring guards
 
@@ -99,5 +110,5 @@ categorical.
 ## Tests
 
 ```bash
-cd hooks && python3 -m pytest test_guard.py -q
+cd hooks && python3 -m pytest test_guard.py test_doctor.py -q
 ```
